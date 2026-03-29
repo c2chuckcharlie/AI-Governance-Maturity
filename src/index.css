@@ -1,0 +1,65 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", "Noto Sans TC", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "Cormorant Garamond", "Noto Serif TC", serif;
+  --font-mono: "DM Mono", ui-monospace, SFMono-Regular, monospace;
+
+  --color-ink: #1a1a2e;
+  --color-ink-soft: #2d2d4e;
+  --color-gold: #c9a84c;
+  --color-gold-light: #e8c97a;
+  --color-gold-pale: #f5e9c8;
+  --color-jade: #2d7d67;
+  --color-jade-light: #3fa882;
+  --color-jade-pale: #d4f0e8;
+  --color-crimson: #c0392b;
+  --color-crimson-pale: #fde8e6;
+  --color-amber: #d68910;
+  --color-amber-pale: #fef3cd;
+  --color-slate: #4a5568;
+  --color-slate-light: #718096;
+  --color-fog: #f7f6f3;
+}
+
+@layer base {
+  body {
+    @apply bg-fog text-ink font-sans antialiased;
+  }
+}
+
+@layer components {
+  .card {
+    @apply bg-white rounded-2xl shadow-sm border border-black/10 p-8 mb-6;
+  }
+  
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl font-semibold transition-all duration-200 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+  
+  .btn-primary {
+    @apply bg-gold text-ink hover:bg-gold-light hover:-translate-y-0.5 hover:shadow-md;
+  }
+  
+  .btn-secondary {
+    @apply bg-white text-ink border-[1.5px] border-black/10 hover:border-gold hover:bg-gold-pale;
+  }
+  
+  .btn-jade {
+    @apply bg-jade text-white hover:bg-jade-light hover:-translate-y-0.5;
+  }
+  
+  .btn-ink {
+    @apply bg-ink text-white hover:bg-ink-soft;
+  }
+
+  .radio-card {
+    @apply flex items-start gap-3 p-4 border-[1.5px] border-black/10 rounded-xl cursor-pointer transition-all duration-200 bg-white hover:border-gold-light hover:bg-gold/5;
+  }
+  
+  .radio-card.selected {
+    @apply border-gold bg-gold-pale;
+  }
+}
+
+@import url('https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@300;400;600;700&family=Noto+Sans+TC:wght@300;400;500;600&family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300&family=DM+Mono:wght@400;500&display=swap');
