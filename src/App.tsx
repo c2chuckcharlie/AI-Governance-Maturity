@@ -27,24 +27,36 @@ import {
 } from 'lucide-react';
 
 // --- Types ---
-type Lang = 'en' | 'zh';
+type Lang = 'en' | 'zh' | 'ja';
 interface Profile {
+  universityName: string;
   role: string;
   focus: string;
   selfMaturity: string;
 }
 
 export default function App() {
-  const [lang, setLang] = useState<Lang>('en');
+  const [lang, setLang] = useState<Lang>(() => {
+    const saved = localStorage.getItem('app_lang');
+    if (saved === 'en' || saved === 'zh' || saved === 'ja') return saved;
+    const browserLang = navigator.language.toLowerCase();
+    if (browserLang.startsWith('zh')) return 'zh';
+    if (browserLang.startsWith('ja')) return 'ja';
+    return 'en';
+  });
   const [currentStep, setCurrentStep] = useState(1);
   const [completedSteps, setCompletedSteps] = useState<number[]>([]);
-  const [profile, setProfile] = useState<Profile>({ role: '', focus: '', selfMaturity: '' });
+  const [profile, setProfile] = useState<Profile>({ universityName: '', role: '', focus: '', selfMaturity: '' });
   const [answers, setAnswers] = useState<Record<string, { level: number; label: string }>>({});
   const [isGenerating, setIsGenerating] = useState(false);
   const [reportContent, setReportContent] = useState('');
   const [editableReport, setEditableReport] = useState('');
   const [selectedUni, setSelectedUni] = useState<string | null>(null);
   const [whatif, setWhatif] = useState<Record<string, number | null>>({ p1: null, p2: null, p3: null, p4: null });
+
+  useEffect(() => {
+    localStorage.setItem('app_lang', lang);
+  }, [lang]);
 
   const t = (key: string) => {
     const keys = key.split('.');
@@ -82,14 +94,14 @@ export default function App() {
   const handleNext = () => {
     if (currentStep === 1) {
       if (!profile.role || !profile.focus || !profile.selfMaturity) {
-        alert(lang === 'zh' ? '請完成所有選項後再繼續。' : 'Please complete all selections before proceeding.');
+        alert(t('completeSelections'));
         return;
       }
     }
     if (currentStep === 2) {
       const unanswered = SCENARIOS.filter(s => !answers[s.id]);
       if (unanswered.length > 0) {
-        alert(lang === 'zh' ? `尚有 ${unanswered.length} 個情境題未作答。` : `${unanswered.length} scenario(s) not answered.`);
+        alert(`${unanswered.length} ${t('scenariosUnanswered')}`);
         return;
       }
     }
@@ -110,11 +122,11 @@ export default function App() {
     setIsGenerating(true);
     try {
       const data = { profile, scores, overallScore };
-      const report = await generateStrategicReport(data, lang);
+      const report = await generateStrategicReport(data, lang, profile.universityName);
       setReportContent(report);
       setEditableReport(report);
     } catch (error) {
-      alert(lang === 'zh' ? '報告生成失敗，請重試。' : 'Failed to generate report. Please try again.');
+      alert(t('alerts.genFailed'));
     } finally {
       setIsGenerating(false);
     }
@@ -127,7 +139,8 @@ export default function App() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.setAttribute('download', `NCHU_AI_Governance_Report_${new Date().toISOString().split('T')[0]}.txt`);
+    const fileName = profile.universityName ? `${profile.universityName}_AI_Governance_Report` : 'AI_Governance_Report';
+    link.setAttribute('download', `${fileName}_${new Date().toISOString().split('T')[0]}.txt`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -155,13 +168,19 @@ export default function App() {
             onClick={() => setLang('zh')}
             className={`px-4 py-1.5 rounded-full text-xs font-bold tracking-wider transition-all ${lang === 'zh' ? 'bg-gold text-ink' : 'text-white/60 hover:text-white'}`}
           >
-            中文
+            繁中
           </button>
           <button 
             onClick={() => setLang('en')}
             className={`px-4 py-1.5 rounded-full text-xs font-bold tracking-wider transition-all ${lang === 'en' ? 'bg-gold text-ink' : 'text-white/60 hover:text-white'}`}
           >
             EN
+          </button>
+          <button 
+            onClick={() => setLang('ja')}
+            className={`px-4 py-1.5 rounded-full text-xs font-bold tracking-wider transition-all ${lang === 'ja' ? 'bg-gold text-ink' : 'text-white/60 hover:text-white'}`}
+          >
+            日本語
           </button>
         </div>
       </div>
@@ -230,6 +249,7 @@ export default function App() {
             )}
             {currentStep === 3 && (
               <Step3Maturity 
+                profile={profile}
                 scores={scores} 
                 overallScore={overallScore} 
                 maturityLevel={maturityLevel}
@@ -243,6 +263,7 @@ export default function App() {
             )}
             {currentStep === 4 && (
               <Step4GapAnalysis 
+                profile={profile}
                 scores={scores}
                 selectedUni={selectedUni}
                 setSelectedUni={setSelectedUni}
@@ -289,21 +310,37 @@ export default function App() {
 // --- Sub-components (could be in separate files) ---
 
 function Step1Profile({ profile, setProfile, lang, t, onNext }: any) {
-  const isZH = lang === 'zh';
   return (
     <div className="space-y-8">
       <div className="text-center mb-10">
-        <p className="font-serif text-xs uppercase tracking-[0.2em] text-slate-light mb-2">{isZH ? '第一步' : 'Step 1 of 5'}</p>
-        <h2 className="font-serif text-4xl font-bold text-ink mb-4">{isZH ? '用戶資料與情境設定' : 'User Profile & Context Setting'}</h2>
-        <p className="text-slate-light max-w-xl mx-auto">{isZH ? '請提供您的職位與主要關注領域，以便系統產生量身訂製的治理分析。' : 'Provide your role and strategic focus to receive a tailored governance analysis.'}</p>
+        <p className="font-serif text-xs uppercase tracking-[0.2em] text-slate-light mb-2">{t('step')} 1 of 5</p>
+        <h2 className="font-serif text-4xl font-bold text-ink mb-4">{t('step1Title')}</h2>
+        <p className="text-slate-light max-w-xl mx-auto">{t('step1Desc')}</p>
+      </div>
+
+      <div className="card">
+        <div className="flex items-start gap-4 mb-6 pb-5 border-b border-black/10">
+          <div className="w-12 h-12 bg-indigo-pale rounded-xl flex items-center justify-center text-2xl">🏛️</div>
+          <div>
+            <h3 className="font-serif text-2xl font-bold text-ink">{t('uniNameLabel')}</h3>
+            <p className="text-xs text-slate-light mt-1">{t('uniNameDesc')}</p>
+          </div>
+        </div>
+        <input 
+          type="text" 
+          value={profile.universityName}
+          onChange={(e) => setProfile({ ...profile, universityName: e.target.value })}
+          placeholder={t('uniNamePlaceholder')}
+          className="w-full p-4 bg-fog rounded-xl border-2 border-transparent focus:border-gold focus:bg-white outline-none transition-all text-ink font-medium"
+        />
       </div>
 
       <div className="card">
         <div className="flex items-start gap-4 mb-8 pb-5 border-b border-black/10">
           <div className="w-12 h-12 bg-gold-pale rounded-xl flex items-center justify-center text-2xl">👤</div>
           <div>
-            <h3 className="font-serif text-2xl font-bold text-ink">{isZH ? '職位與角色' : 'Role & Position'}</h3>
-            <p className="text-xs text-slate-light mt-1">{isZH ? '選擇最能代表您在中興大學職責的角色' : 'Select the role that best represents your responsibilities at NCHU'}</p>
+            <h3 className="font-serif text-2xl font-bold text-ink">{t('roleLabel')}</h3>
+            <p className="text-xs text-slate-light mt-1">{t('roleDesc')}</p>
           </div>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -329,8 +366,8 @@ function Step1Profile({ profile, setProfile, lang, t, onNext }: any) {
         <div className="flex items-start gap-4 mb-8 pb-5 border-b border-black/10">
           <div className="w-12 h-12 bg-jade-pale rounded-xl flex items-center justify-center text-2xl">🎯</div>
           <div>
-            <h3 className="font-serif text-2xl font-bold text-ink">{isZH ? '主要關注領域' : 'Primary Strategic Focus'}</h3>
-            <p className="text-xs text-slate-light mt-1">{isZH ? '在 AI 治理背景下，您最關注的領域為何？' : 'What is your primary area of concern in the context of AI governance?'} </p>
+            <h3 className="font-serif text-2xl font-bold text-ink">{t('focusTitle')}</h3>
+            <p className="text-xs text-slate-light mt-1">{t('focusDesc')} </p>
           </div>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -353,8 +390,8 @@ function Step1Profile({ profile, setProfile, lang, t, onNext }: any) {
         <div className="flex items-start gap-4 mb-8 pb-5 border-b border-black/10">
           <div className="w-12 h-12 bg-amber-pale rounded-xl flex items-center justify-center text-2xl">📊</div>
           <div>
-            <h3 className="font-serif text-2xl font-bold text-ink">{isZH ? '自我評估：目前 AI 成熟度' : 'Self-Assessment: Current AI Maturity'}</h3>
-            <p className="text-xs text-slate-light mt-1">{isZH ? '根據您的觀察，貴校目前的 AI 治理成熟度大致屬於哪個層級？' : 'Based on your observation, where would you place NCHU\'s AI governance maturity?'}</p>
+            <h3 className="font-serif text-2xl font-bold text-ink">{t('selfMatTitle')}</h3>
+            <p className="text-xs text-slate-light mt-1">{t('selfMatDesc')}</p>
           </div>
         </div>
         <div className="space-y-3">
@@ -383,7 +420,6 @@ function Step1Profile({ profile, setProfile, lang, t, onNext }: any) {
 }
 
 function Step2Assessment({ answers, setAnswers, lang, t, onNext, onBack }: any) {
-  const isZH = lang === 'zh';
   const pillars = t('pillars');
   const pillarIcons = ['🏛', '🤝', '⚙️', '🚀'];
   const pillarColors = ['gold', 'jade', 'amber', 'crimson'];
@@ -391,9 +427,9 @@ function Step2Assessment({ answers, setAnswers, lang, t, onNext, onBack }: any) 
   return (
     <div className="space-y-8">
       <div className="text-center mb-10">
-        <p className="font-serif text-xs uppercase tracking-[0.2em] text-slate-light mb-2">{isZH ? '第二步' : 'Step 2 of 5'}</p>
-        <h2 className="font-serif text-4xl font-bold text-ink mb-4">{isZH ? '情境式評估' : 'Scenario-Based Assessment'}</h2>
-        <p className="text-slate-light max-w-xl mx-auto">{isZH ? '針對 4 大治理支柱，評選最接近中興大學現況的選項。' : 'For each of the 4 governance pillars, select the option that best reflects NCHU\'s current state.'}</p>
+        <p className="font-serif text-xs uppercase tracking-[0.2em] text-slate-light mb-2">{t('step')} 2 of 5</p>
+        <h2 className="font-serif text-4xl font-bold text-ink mb-4">{t('step2Title')}</h2>
+        <p className="text-slate-light max-w-xl mx-auto">{t('step2Desc')}</p>
       </div>
 
       {[0, 1, 2, 3].map(pIdx => (
@@ -401,8 +437,8 @@ function Step2Assessment({ answers, setAnswers, lang, t, onNext, onBack }: any) 
           <div className="flex items-start gap-4 mb-8 pb-5 border-b border-black/10">
             <div className={`w-12 h-12 bg-${pillarColors[pIdx]}-pale rounded-xl flex items-center justify-center text-2xl`}>{pillarIcons[pIdx]}</div>
             <div>
-              <h3 className="font-serif text-2xl font-bold text-ink">{isZH ? `支柱 ${pIdx + 1}：` : `Pillar ${pIdx + 1}: `}{pillars[pIdx]}</h3>
-              <p className="text-xs text-slate-light mt-1">{SCENARIOS.filter(s => s.pillar === pIdx).length} {isZH ? '個情境題' : 'scenarios'}</p>
+              <h3 className="font-serif text-2xl font-bold text-ink">{t('pillarLabel')} {pIdx + 1}: {pillars[pIdx]}</h3>
+              <p className="text-xs text-slate-light mt-1">{SCENARIOS.filter(s => s.pillar === pIdx).length} {t('scenariosLabel')}</p>
             </div>
           </div>
           
@@ -415,7 +451,7 @@ function Step2Assessment({ answers, setAnswers, lang, t, onNext, onBack }: any) 
                   <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-gold/15 text-gold text-[10px] font-bold uppercase tracking-wider mb-4">
                     {pillarIcons[pIdx]} {pillars[pIdx]}
                   </div>
-                  <div className="text-xs italic text-slate-light mb-2">🔍 {isZH ? '情境：' : 'Context: '}{sd.context}</div>
+                  <div className="text-xs italic text-slate-light mb-2">🔍 {t('contextLabel')}: {sd.context}</div>
                   <div className="text-base font-bold text-ink mb-6">❓ {sd.question}</div>
                   <div className="grid grid-cols-1 gap-3">
                     {sd.options.map((opt: any) => (
@@ -453,8 +489,7 @@ function Step2Assessment({ answers, setAnswers, lang, t, onNext, onBack }: any) 
   );
 }
 
-function Step3Maturity({ scores, overallScore, maturityLevel, whatif, setWhatif, lang, t, onNext, onBack }: any) {
-  const isZH = lang === 'zh';
+function Step3Maturity({ profile, scores, overallScore, maturityLevel, whatif, setWhatif, lang, t, onNext, onBack }: any) {
   const pillars = t('pillars');
   const maturityNames = t('maturityLevels');
   const scoreColors = ['#c0392b', '#d68910', '#c9a84c', '#2d7d67', '#1a1a2e'];
@@ -474,24 +509,24 @@ function Step3Maturity({ scores, overallScore, maturityLevel, whatif, setWhatif,
   return (
     <div className="space-y-8">
       <div className="text-center mb-10">
-        <p className="font-serif text-xs uppercase tracking-[0.2em] text-slate-light mb-2">{isZH ? '第三步' : 'Step 3 of 5'}</p>
-        <h2 className="font-serif text-4xl font-bold text-ink mb-4">{isZH ? '成熟度模型評量' : 'Maturity Model Evaluation'}</h2>
-        <p className="text-slate-light max-w-xl mx-auto">{isZH ? '根據您的情境選擇，以下為中興大學各支柱的 AI 治理成熟度評分。' : 'Based on your scenario selections, here is NCHU\'s AI governance maturity across all pillars.'}</p>
+        <p className="font-serif text-xs uppercase tracking-[0.2em] text-slate-light mb-2">{t('step')} 3 of 5</p>
+        <h2 className="font-serif text-4xl font-bold text-ink mb-4">{t('step3Title')}</h2>
+        <p className="text-slate-light max-w-xl mx-auto">{t('step3Desc')}</p>
       </div>
 
       <div className="card">
         <div className="flex items-start gap-4 mb-8 pb-5 border-b border-black/10">
           <div className="w-12 h-12 bg-gold-pale rounded-xl flex items-center justify-center text-2xl">📊</div>
           <div>
-            <h3 className="font-serif text-2xl font-bold text-ink">{isZH ? '整體成熟度評分' : 'Overall Maturity Score'}</h3>
-            <p className="text-xs text-slate-light mt-1">{isZH ? '四大支柱綜合計算結果' : 'Composite score across all four governance pillars'}</p>
+            <h3 className="font-serif text-2xl font-bold text-ink">{t('overallMaturityTitle')}</h3>
+            <p className="text-xs text-slate-light mt-1">{t('overallMaturityDesc')}</p>
           </div>
         </div>
         <div className="text-center py-8">
           <div className="font-serif text-8xl font-bold leading-none mb-4" style={{ color: scoreColors[maturityLevel] }}>
             {overallScore.toFixed(2)}
           </div>
-          <div className="text-slate-light mb-6">{isZH ? '滿分 5.00' : '/ 5.00'}</div>
+          <div className="text-slate-light mb-6">{t('maxScoreLabel')}</div>
           <div className={`inline-flex items-center gap-3 px-6 py-3 rounded-full font-bold text-lg shadow-sm ${
             maturityLevel === 0 ? 'bg-crimson-pale text-crimson' :
             maturityLevel === 1 ? 'bg-amber-pale text-amber' :
@@ -510,7 +545,7 @@ function Step3Maturity({ scores, overallScore, maturityLevel, whatif, setWhatif,
                 i === 0 ? 'bg-gold' : i === 1 ? 'bg-jade' : i === 2 ? 'bg-amber' : 'bg-crimson'
               }`} />
               <div className="font-serif text-3xl font-bold text-ink">{s.toFixed(1)}</div>
-              <div className="text-[10px] text-slate-light uppercase tracking-wider mt-1">{isZH ? '滿分 5.0' : '/ 5.0'}</div>
+              <div className="text-[10px] text-slate-light uppercase tracking-wider mt-1">{t('maxScoreLabel')}</div>
               <div className="text-xs font-bold text-slate mt-3 leading-tight">{pillars[i]}</div>
             </div>
           ))}
@@ -545,16 +580,16 @@ function Step3Maturity({ scores, overallScore, maturityLevel, whatif, setWhatif,
             ))}
           </div>
           <div className="bg-white/5 border border-gold/30 rounded-2xl p-6">
-            <div className="text-xs text-white/50 mb-1">{isZH ? '模擬後整體成熟度' : 'Simulated Overall Score'}</div>
+            <div className="text-xs text-white/50 mb-1">{t('simulatedOverallLabel')}</div>
             <div className="font-serif text-5xl font-bold text-gold mb-2">{simulatedOverall.toFixed(2)}</div>
             <div className="text-xs font-medium">
-              {isZH ? '較現況' : 'vs current'} {overallScore.toFixed(2)} 
+              {t('vsCurrentLabel')} {overallScore.toFixed(2)} 
               <span className={`ml-2 ${simulatedOverall > overallScore ? 'text-jade-light' : simulatedOverall < overallScore ? 'text-crimson' : 'text-white/40'}`}>
-                {simulatedOverall > overallScore ? `▲ +${(simulatedOverall - overallScore).toFixed(2)}` : simulatedOverall < overallScore ? `▼ ${(simulatedOverall - overallScore).toFixed(2)}` : '（持平）'}
+                {simulatedOverall > overallScore ? `▲ +${(simulatedOverall - overallScore).toFixed(2)}` : simulatedOverall < overallScore ? `▼ ${(simulatedOverall - overallScore).toFixed(2)}` : t('noChangeLabel')}
               </span>
             </div>
             <div className="mt-4 pt-4 border-t border-white/10 text-[10px] text-white/40 uppercase tracking-widest">
-              {isZH ? '模擬成熟度等級：' : 'Simulated Level: '}{maturityNames[simulatedLvl]}
+              {t('simulatedLevelLabel')}: {maturityNames[simulatedLvl]}
             </div>
           </div>
         </div>
@@ -569,11 +604,7 @@ function Step3Maturity({ scores, overallScore, maturityLevel, whatif, setWhatif,
         </div>
         <p className="text-sm text-slate font-medium mb-4">{t('insightText')}</p>
         <div className="bg-crimson-pale border-l-4 border-crimson p-4 rounded-r-xl text-sm text-crimson font-bold leading-relaxed">
-          {maturityLevel === 0 && (isZH ? '若不介入，AI 零散採用將加深孤島效應，隨著教育部法規收緊，合規風險將顯著上升。' : 'Without intervention, fragmented AI adoption will deepen silos, creating compliance risks as MOE regulations tighten.')}
-          {maturityLevel === 1 && (isZH ? '非正式 AI 計畫將帶來技術債務與政策缺口。若高層缺乏明確治理訊號，教師對 AI 系統的信任可能逐漸流失。' : 'Informal AI initiatives risk creating technical debt and policy gaps. Faculty trust in AI may erode without clear governance.')}
-          {maturityLevel === 2 && (isZH ? '中度整合若未正式化治理，隨著教師輪替，有退回零散狀態的風險。同儕機構屆時將大幅領先。' : 'Moderate integration without formalization risks reverting to fragmented practices. Peer institutions will advance ahead.')}
-          {maturityLevel === 3 && (isZH ? '治理框架完善，但若未持續投資能力發展，中興大學將面臨「治理劇場」風險。' : 'Strong governance exists, but without continuous investment, NCHU risks "governance theater" — policies without adoption.')}
-          {maturityLevel === 4 && (isZH ? '定位優異。主要風險為治理自滿——靜態框架在動態 AI 環境中，18 個月內將導致退步。' : 'Excellent positioning. Primary risk is governance complacency — static frameworks will cause regression within 18 months.')}
+          {t('riskInsights')[maturityLevel]}
         </div>
       </div>
 
@@ -589,11 +620,10 @@ function Step3Maturity({ scores, overallScore, maturityLevel, whatif, setWhatif,
   );
 }
 
-function Step4GapAnalysis({ scores, selectedUni, setSelectedUni, lang, t, onNext, onBack }: any) {
-  const isZH = lang === 'zh';
+function Step4GapAnalysis({ profile, scores, selectedUni, setSelectedUni, lang, t, onNext, onBack }: any) {
   const pillars = t('pillars');
   const usBenchmarkByPillar = [4.5, 4.3, 4.4, 4.2];
-  const gapLabels = t('gapLabel');
+  const gapLabels = t('gapLabels');
   const pillarColors = ['#c9a84c', '#2d7d67', '#d68910', '#c0392b'];
 
   const getGapStatus = (nchu: number, us: number) => {
@@ -608,17 +638,17 @@ function Step4GapAnalysis({ scores, selectedUni, setSelectedUni, lang, t, onNext
   return (
     <div className="space-y-8">
       <div className="text-center mb-10">
-        <p className="font-serif text-xs uppercase tracking-[0.2em] text-slate-light mb-2">{isZH ? '第四步' : 'Step 4 of 5'}</p>
-        <h2 className="font-serif text-4xl font-bold text-ink mb-4">{isZH ? '差距分析：對標美國大學' : 'Gap Analysis vs. U.S. Universities'}</h2>
-        <p className="text-slate-light max-w-xl mx-auto">{isZH ? '將中興大學各支柱成熟度與美國標竿大學進行比較。' : 'Compare NCHU\'s pillar scores against best practices from leading U.S. universities.'}</p>
+        <p className="font-serif text-xs uppercase tracking-[0.2em] text-slate-light mb-2">{t('step')} 4 of 5</p>
+        <h2 className="font-serif text-4xl font-bold text-ink mb-4">{t('step4Title')}</h2>
+        <p className="text-slate-light max-w-xl mx-auto">{t('step4Desc')}</p>
       </div>
 
       <div className="card">
         <div className="flex items-start gap-4 mb-8 pb-5 border-b border-black/10">
           <div className="w-12 h-12 bg-crimson-pale rounded-xl flex items-center justify-center text-2xl">📐</div>
           <div>
-            <h3 className="font-serif text-2xl font-bold text-ink">{isZH ? '支柱差距比較' : 'Pillar Gap Comparison'}</h3>
-            <p className="text-xs text-slate-light mt-1">{isZH ? '實線 = 中興大學 | 虛線標記 = 美國標竿水準' : 'Solid bar = NCHU | Dashed marker = U.S. benchmark'}</p>
+            <h3 className="font-serif text-2xl font-bold text-ink">{t('gapCompLabel')}</h3>
+            <p className="text-xs text-slate-light mt-1">{t('gapCompDesc')}</p>
           </div>
         </div>
 
@@ -646,7 +676,7 @@ function Step4GapAnalysis({ scores, selectedUni, setSelectedUni, lang, t, onNext
                     className="absolute inset-y-0 left-0 flex items-center pl-4 text-[10px] font-bold text-white shadow-inner"
                     style={{ backgroundColor: pillarColors[i] }}
                   >
-                    NCHU {s.toFixed(1)}
+                    {t('yourInstitution')} {s.toFixed(1)}
                   </motion.div>
                   <div className="absolute top-1 bottom-1 w-0.5 bg-crimson/60 z-10" style={{ left: `${usPct}%` }} />
                   <div className="absolute top-1/2 -translate-y-1/2 text-[9px] font-bold text-crimson font-mono whitespace-nowrap" style={{ left: `calc(${usPct}% + 8px)` }}>
@@ -663,8 +693,8 @@ function Step4GapAnalysis({ scores, selectedUni, setSelectedUni, lang, t, onNext
         <div className="flex items-start gap-4 mb-8 pb-5 border-b border-black/10">
           <div className="w-12 h-12 bg-gold-pale rounded-xl flex items-center justify-center text-2xl">🏫</div>
           <div>
-            <h3 className="font-serif text-2xl font-bold text-ink">{isZH ? '美國標竿大學' : 'U.S. Benchmark Universities'}</h3>
-            <p className="text-xs text-slate-light mt-1">{isZH ? '點擊各大學了解其 AI 治理最佳實踐' : 'Click each university to explore AI governance practices'}</p>
+            <h3 className="font-serif text-2xl font-bold text-ink">{t('benchmarkTitle')}</h3>
+            <p className="text-xs text-slate-light mt-1">{t('benchmarkDesc')}</p>
           </div>
         </div>
 
@@ -685,7 +715,7 @@ function Step4GapAnalysis({ scores, selectedUni, setSelectedUni, lang, t, onNext
                 <div className="text-xs text-slate-light leading-relaxed mb-4">{ud.summary}</div>
                 <div className={`flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider ${isActive ? 'text-jade' : 'text-gold'}`}>
                   {isActive ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                  {isActive ? (isZH ? '收起詳情' : 'Collapse') : (isZH ? '點擊深入了解' : 'Explore')}
+                  {isActive ? t('collapse') : t('explore')}
                 </div>
               </div>
             );
@@ -716,7 +746,7 @@ function Step4GapAnalysis({ scores, selectedUni, setSelectedUni, lang, t, onNext
                 </div>
 
                 <div className="bg-gold/10 border border-gold/30 rounded-2xl p-6 mb-8">
-                  <div className="text-[10px] font-bold text-gold uppercase tracking-widest mb-3">💡 {isZH ? '中興大學可學習之處' : 'What NCHU Can Learn'}</div>
+                  <div className="text-[10px] font-bold text-gold uppercase tracking-widest mb-3">💡 {t('learnFromLabel')}</div>
                   <div className="text-sm text-white/90 leading-relaxed italic">
                     {(activeUni as any)[lang].insight}
                   </div>
@@ -729,10 +759,10 @@ function Step4GapAnalysis({ scores, selectedUni, setSelectedUni, lang, t, onNext
                     rel="noopener noreferrer"
                     className="btn btn-primary text-xs px-6 py-2.5 rounded-xl"
                   >
-                    <ExternalLink size={14} /> {isZH ? '查看完整報告' : 'View Full Report'}
+                    <ExternalLink size={14} /> {t('viewFullReport')}
                   </a>
                   <button onClick={() => setSelectedUni(null)} className="btn bg-white/10 text-white text-xs px-6 py-2.5 rounded-xl hover:bg-white/20">
-                    {isZH ? '收起' : 'Collapse'}
+                    {t('collapse')}
                   </button>
                 </div>
               </div>
@@ -754,7 +784,6 @@ function Step4GapAnalysis({ scores, selectedUni, setSelectedUni, lang, t, onNext
 }
 
 function Step5Report({ profile, scores, overallScore, maturityLevel, reportContent, editableReport, setEditableReport, isGenerating, onGenerate, onDownload, lang, t, onBack }: any) {
-  const isZH = lang === 'zh';
   const pillars = t('pillars');
   const maturityNames = t('maturityLevels');
   const roleLabel = t('roles').find((r: any) => r.val === profile.role)?.label || profile.role;
@@ -762,28 +791,28 @@ function Step5Report({ profile, scores, overallScore, maturityLevel, reportConte
   return (
     <div className="space-y-8">
       <div className="text-center mb-10">
-        <p className="font-serif text-xs uppercase tracking-[0.2em] text-slate-light mb-2">{isZH ? '第五步' : 'Step 5 of 5'}</p>
-        <h2 className="font-serif text-4xl font-bold text-ink mb-4">{isZH ? 'AI 策略報告生成' : 'AI-Generated Strategic Report'}</h2>
-        <p className="text-slate-light max-w-xl mx-auto">{isZH ? '根據您的完整評估結果，系統將生成量身訂製的行政策略報告。' : 'Based on your complete assessment, the system will generate a tailored executive strategic report.'}</p>
+        <p className="font-serif text-xs uppercase tracking-[0.2em] text-slate-light mb-2">{t('step')} 5 of 5</p>
+        <h2 className="font-serif text-4xl font-bold text-ink mb-4">{t('step5Title')}</h2>
+        <p className="text-slate-light max-w-xl mx-auto">{t('step5Desc')}</p>
       </div>
 
       <div className="card">
         <div className="flex items-start gap-4 mb-8 pb-5 border-b border-black/10">
           <div className="w-12 h-12 bg-jade-pale rounded-xl flex items-center justify-center text-2xl">📋</div>
           <div>
-            <h3 className="font-serif text-2xl font-bold text-ink">{isZH ? '報告操作面板' : 'Report Control Panel'}</h3>
-            <p className="text-xs text-slate-light mt-1">{isZH ? '生成、預覽並下載您的完整 AI 治理策略報告' : 'Generate, preview, and download your complete AI governance strategic report'}</p>
+            <h3 className="font-serif text-2xl font-bold text-ink">{t('reportPanelLabel')}</h3>
+            <p className="text-xs text-slate-light mt-1">{t('reportPanelDesc')}</p>
           </div>
         </div>
 
         <div className="bg-gold-pale/40 border border-gold/20 rounded-2xl p-6 mb-8">
-          <div className="text-[10px] font-bold text-slate uppercase tracking-widest mb-4">{isZH ? '評估摘要' : 'Assessment Summary'}</div>
+          <div className="text-[10px] font-bold text-slate uppercase tracking-widest mb-4">{t('assessmentSummary')}</div>
           <div className="flex flex-wrap gap-3 mb-6">
             <div className="px-3 py-1.5 bg-white rounded-full text-xs font-bold text-ink shadow-sm border border-black/5 flex items-center gap-2">
               <User size={14} className="text-gold" /> {roleLabel}
             </div>
             <div className="px-3 py-1.5 bg-white rounded-full text-xs font-bold text-ink shadow-sm border border-black/5 flex items-center gap-2">
-              <BarChart3 size={14} className="text-jade" /> {isZH ? '整體分數' : 'Overall'}: {overallScore.toFixed(2)}/5
+              <BarChart3 size={14} className="text-jade" /> {t('overallLabel')}: {overallScore.toFixed(2)}/5
             </div>
             <div className={`px-3 py-1.5 rounded-full text-xs font-bold shadow-sm border border-black/5 flex items-center gap-2 ${
               maturityLevel === 0 ? 'bg-crimson-pale text-crimson' :
@@ -811,7 +840,7 @@ function Step5Report({ profile, scores, overallScore, maturityLevel, reportConte
             disabled={isGenerating}
             className="btn btn-ink w-full sm:w-auto px-10 py-4 text-lg rounded-2xl shadow-lg"
           >
-            <Zap size={20} className="text-gold" /> {isZH ? '生成 AI 策略報告' : 'Generate AI Strategic Report'}
+            <Zap size={20} className="text-gold" /> {t('generateBtn')}
           </button>
           
           <div className="flex gap-3 w-full sm:w-auto">
@@ -823,14 +852,14 @@ function Step5Report({ profile, scores, overallScore, maturityLevel, reportConte
               disabled={!reportContent}
               className="btn btn-secondary flex-1 sm:flex-none px-6 py-4 rounded-2xl"
             >
-              <Eye size={18} /> {isZH ? '預覽' : 'Preview'}
+              <Eye size={18} /> {t('previewBtn')}
             </button>
             <button 
               onClick={onDownload}
               disabled={!reportContent}
               className="btn btn-jade flex-1 sm:flex-none px-6 py-4 rounded-2xl shadow-md"
             >
-              <Download size={18} /> {isZH ? '下載' : 'Download'}
+              <Download size={18} /> {t('downloadBtn')}
             </button>
           </div>
         </div>
@@ -844,8 +873,8 @@ function Step5Report({ profile, scores, overallScore, maturityLevel, reportConte
           className="space-y-6"
         >
           <div className="flex items-center justify-between">
-            <h3 className="font-serif text-2xl font-bold text-ink">{isZH ? '報告預覽與編輯' : 'Report Preview & Edit'}</h3>
-            <p className="text-xs text-slate-light">{isZH ? '您可以直接編輯以下內容後再下載' : 'You can edit the content below before downloading'}</p>
+            <h3 className="font-serif text-2xl font-bold text-ink">{t('reportEditorTitle')}</h3>
+            <p className="text-xs text-slate-light">{t('reportEditorDesc')}</p>
           </div>
           <textarea 
             value={editableReport}
@@ -854,7 +883,7 @@ function Step5Report({ profile, scores, overallScore, maturityLevel, reportConte
           />
           <div className="flex justify-center">
             <button onClick={onDownload} className="btn btn-jade px-12 py-5 text-xl rounded-2xl shadow-xl">
-              <Download size={24} /> {isZH ? '下載最終報告 (.txt)' : 'Download Final Report (.txt)'}
+              <Download size={24} /> {t('downloadBtn')}
             </button>
           </div>
         </motion.div>

@@ -2,14 +2,22 @@ import { GoogleGenAI, GenerateContentResponse } from "@google/genai";
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" });
 
-export async function generateStrategicReport(data: any, lang: 'en' | 'zh') {
+export async function generateStrategicReport(data: any, lang: 'en' | 'zh' | 'ja', universityName?: string) {
   const model = "gemini-3-flash-preview";
   
+  const institution = universityName || (lang === 'zh' ? '貴校' : lang === 'ja' ? '貴学' : 'Your Institution');
+  
+  const langName = {
+    zh: 'Traditional Chinese (繁體中文)',
+    en: 'English',
+    ja: 'Japanese (日本語)'
+  }[lang];
+
   const prompt = `
     You are a Senior AI Governance Consultant specializing in Higher Education.
-    Generate a comprehensive strategic report for National Chung Hsing University (NCHU) based on the following assessment data.
+    Generate a comprehensive strategic report for ${institution} based on the following assessment data.
     
-    Language: ${lang === 'zh' ? 'Traditional Chinese (繁體中文)' : 'English'}
+    Language: ${langName}
     
     User Profile:
     - Role: ${data.profile.role}
@@ -39,6 +47,7 @@ export async function generateStrategicReport(data: any, lang: 'en' | 'zh') {
     
     Format the output as a professional, structured document with clear headings and bullet points.
     Do not use markdown formatting like bold (**) or italics (*) in the final text, use plain text structure with clear headers (e.g., SECTION 1: ...).
+    Ensure the tone is formal and suitable for university leadership.
   `;
 
   try {
